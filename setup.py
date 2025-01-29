@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='VolumetricSMPL',
-    version='1.0.0',
+    version='1.0.2',
     packages=['VolumetricSMPL'],
     url='https://github.com/markomih/VolumetricSMPL',
     license='MIT',
@@ -15,7 +15,6 @@ setup(
     long_description=long_description,
     python_requires='>=3.6.0',
     install_requires=[
-        'torch>=1.0',
         'numpy>=1.12.2',
         'trimesh',
         'scikit-image',
