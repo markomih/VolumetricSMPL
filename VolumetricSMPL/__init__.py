@@ -1,9 +1,11 @@
 import torch
 import smplx
 from .volumetric_smpl import VolumetricSMPL
+from .winding_numbers import winding_numbers
 
 def attach_volume(parametric_body: smplx.SMPL, pretrained=True, device=None):
-    volumetric_body = VolumetricSMPL(parametric_body)
+    cfg = {'rf_kwargs': {'rank': 80}, 'decoder_dims': [64, 64, 64, 64, 64, 64], 'decoder_multires': 2, 'decoder_skip_in': [3]}
+    volumetric_body = VolumetricSMPL(parametric_body, cfg)
     setattr(parametric_body, 'volume', volumetric_body)
     if pretrained:
         model_type = volumetric_body.model_type

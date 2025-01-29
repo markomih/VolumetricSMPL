@@ -514,15 +514,15 @@ def point_mesh_distance(meshes: Meshes, pcls: Pointclouds):
 
 class BasicBodyModel(torch.nn.Module):
 
-    def __init__(self, parametric_body: smplx.SMPL, coap_cfg={}) -> None:
+    def __init__(self, parametric_body: smplx.SMPL, body_cfg={}) -> None:
         super().__init__()
-        self._init(parametric_body, coap_cfg)
+        self._init(parametric_body, body_cfg)
 
-    def _init(self, parametric_body: smplx.SMPL, coap_cfg={}) -> None:
-        self.coap_cfg = coap_cfg
+    def _init(self, parametric_body: smplx.SMPL, body_cfg={}) -> None:
+        self.body_cfg = body_cfg
 
         # hyperparameters
-        self.n_samples = self.coap_cfg.get('n_samples', 1000)
+        self.n_samples = self.body_cfg.get('n_samples', 1000)
         self.bbox_padding = 1.125  # bounding box size
 
         # create differentiable modules
@@ -543,7 +543,7 @@ class BasicBodyModel(torch.nn.Module):
         self.model_type = self.partitioner.model_type
 
     def create_encoder(self):
-        resnet_kwargs = self.coap_cfg.get('resnet_kwargs', dict(out_dim=128, hidden_dim=128, dim=3, use_block2=False))
+        resnet_kwargs = self.body_cfg.get('resnet_kwargs', dict(out_dim=128, hidden_dim=128, dim=3, use_block2=False))
         encoder = ResnetPointnet(**resnet_kwargs)
         return encoder
 
@@ -921,27 +921,27 @@ class BasicBodyModel(torch.nn.Module):
         ])
 
 class VolumetricSMPL(BasicBodyModel): #  volSMPL model
-    def _init(self, parametric_body: smplx.SMPL, coap_cfg={}) -> None:
-        self.coap_cfg = coap_cfg
+    def _init(self, parametric_body: smplx.SMPL, body_cfg={}) -> None:
+        self.body_cfg = body_cfg
 
         # hyperparameters
-        self.n_samples = self.coap_cfg.get('n_samples', 1000)
+        self.n_samples = self.body_cfg.get('n_samples', 1000)
         self.bbox_padding = 1.125  # bounding box size
 
-        self.sdf_regularization = self.coap_cfg.get('sdf_regularization', False)
-        self.igr_normalize_part_loss = self.coap_cfg.get('igr_normalize_part_loss', False)
-        self.cond_decoder = self.coap_cfg.get('cond_decoder', True)
-        self.part_weights = self.coap_cfg.get('part_weights', True)
-        self.part_rank = self.coap_cfg.get('part_rank', 10)
+        self.sdf_regularization = self.body_cfg.get('sdf_regularization', False)
+        self.igr_normalize_part_loss = self.body_cfg.get('igr_normalize_part_loss', False)
+        self.cond_decoder = self.body_cfg.get('cond_decoder', True)
+        self.part_weights = self.body_cfg.get('part_weights', True)
+        self.part_rank = self.body_cfg.get('part_rank', 10)
 
-        self.rf_kwargs = self.coap_cfg.get('rf_kwargs', dict(rank=10))
-        self.decoder_name = self.coap_cfg.get('decoder_name', 'ImplicitNet')
+        self.rf_kwargs = self.body_cfg.get('rf_kwargs', dict(rank=10))
+        self.decoder_name = self.body_cfg.get('decoder_name', 'ImplicitNet')
         self.decoder_cls = globals()[self.decoder_name]
-        self.decoder_dims = self.coap_cfg.get('decoder_dims', [ 256, 256, 256, 256, 256, 256 ])
-        self.decoder_skip_in = self.coap_cfg.get('decoder_skip_in', [4])
-        self.decoder_multires = self.coap_cfg.get('decoder_multires', 0)
+        self.decoder_dims = self.body_cfg.get('decoder_dims', [ 256, 256, 256, 256, 256, 256 ])
+        self.decoder_skip_in = self.body_cfg.get('decoder_skip_in', [4])
+        self.decoder_multires = self.body_cfg.get('decoder_multires', 0)
 
-        self.loss_weights = self.coap_cfg.get('loss_weights', {})
+        self.loss_weights = self.body_cfg.get('loss_weights', {})
 
         # create differentiable modules
         self.partitioner = Partitioner(parametric_body)
@@ -957,7 +957,7 @@ class VolumetricSMPL(BasicBodyModel): #  volSMPL model
         self.model_type = self.partitioner.model_type
     
     def create_encoder(self):
-        resnet_kwargs = self.coap_cfg.get('resnet_kwargs', dict(out_dim=128, hidden_dim=128, dim=3, use_block2=False))
+        resnet_kwargs = self.body_cfg.get('resnet_kwargs', dict(out_dim=128, hidden_dim=128, dim=3, use_block2=False))
         encoder = ResnetPointnet(**resnet_kwargs)
         return encoder
 
