@@ -4,15 +4,20 @@ from .volumetric_smpl import VolumetricSMPL
 from .winding_numbers import winding_numbers
 
 def attach_volume(parametric_body: smplx.SMPL, pretrained=True, device=None):
-    cfg = {'rf_kwargs': {'rank': 80}, 'decoder_dims': [64, 64, 64, 64, 64, 64], 'decoder_multires': 2, 'decoder_skip_in': [3]}
     if parametric_body.name() == 'MANO':
         cfg = {'rf_kwargs': {'rank': 10}, 'decoder_dims': [64, 64, 64, 64, 64, 64], 'decoder_multires': 2, 'decoder_skip_in': [3]}
+    else:
+        cfg = {'rf_kwargs': {'rank': 80}, 'decoder_dims': [64, 64, 64, 64, 64, 64], 'decoder_multires': 2, 'decoder_skip_in': [3]}
     volumetric_body = VolumetricSMPL(parametric_body, cfg)
     setattr(parametric_body, 'volume', volumetric_body)
     if pretrained:
         model_type = volumetric_body.model_type
         gender = parametric_body.gender
-        checkpoint = f'https://github.com/markomih/VolumetricSMPL/blob/dev/models/VolumetricSMPL_{model_type}_{gender}.ckpt?raw=true'
+        if parametric_body.name() == 'MANO':
+            side = 'right' if parametric_body.is_rhand else 'left'
+            checkpoint = f'https://github.com/markomih/VolumetricSMPL/blob/dev/models/VolumetricSMPL_{model_type}_{gender}_{side}.ckpt?raw=true'
+        else:
+            checkpoint = f'https://github.com/markomih/VolumetricSMPL/blob/dev/models/VolumetricSMPL_{model_type}_{gender}.ckpt?raw=true'
         state_dict = torch.hub.load_state_dict_from_url(checkpoint, progress=True)
         volumetric_body.load_state_dict(state_dict['state_dict'])
     if device is not None:
