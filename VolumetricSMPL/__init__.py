@@ -5,6 +5,8 @@ from .winding_numbers import winding_numbers
 
 def attach_volume(parametric_body: smplx.SMPL, pretrained=True, device=None):
     cfg = {'rf_kwargs': {'rank': 80}, 'decoder_dims': [64, 64, 64, 64, 64, 64], 'decoder_multires': 2, 'decoder_skip_in': [3]}
+    if parametric_body.name() == 'MANO':
+        cfg = {'rf_kwargs': {'rank': 10}, 'decoder_dims': [64, 64, 64, 64, 64, 64], 'decoder_multires': 2, 'decoder_skip_in': [3]}
     volumetric_body = VolumetricSMPL(parametric_body, cfg)
     setattr(parametric_body, 'volume', volumetric_body)
     if pretrained:
