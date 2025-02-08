@@ -662,76 +662,17 @@ class BasicBodyModel(torch.nn.Module):
 
         return occupancy
 
-    def collision_loss(self, point_cloud, smpl_output, ret_collision_mask=False):
-        """
-        Args:
-            point_cloud (list or torch.tensor): B, N, 3
-        """
-        occupancy = self.query(point_cloud, smpl_output)
-        loss = torch.relu(occupancy - self.level_set)  # B,N
-        if ret_collision_mask is not None:
-            inds = loss > 0
-            return loss.sum(-1), inds
-        return loss.sum(-1)  # B, N, 3
-
-
-    def self_collision_loss(self, smpl_output, n_points_uniform=300, at_least_n_samples=2, ret_samples=False):
-        b_smpl_output_list = self.batchify_smpl_output(smpl_output)
-        self_pen_losses = []
-        samples_list = []
-        for b_ind in range(len(b_smpl_output_list)):
-            loss, _samples, _ = self._self_penetration_loss(b_smpl_output_list[b_ind], n_points_uniform, at_least_n_samples)
-            self_pen_losses.append(loss)
-            if ret_samples:
-                samples_list.append(_samples)
-        self_pen_losses = torch.stack(self_pen_losses)
-        if ret_samples:
-            return self_pen_losses, samples_list
-        return self_pen_losses
-
-    def _self_penetration_loss(self, smpl_output, n_points_uniform, at_least_n_samples):
-        """
-        Args:
-            n_points_uniform (int): how many points per collided body part to sample
-
-        Returns:
-
-        """
-        self._attach_impl_code(smpl_output)
-        bb_min = self.impl_code['bbox_min'].squeeze(0)
-        bb_max = self.impl_code['bbox_max'].squeeze(0)
-        device = bb_min.device
-
-        with torch.no_grad():
-            abs_trans = torch.inverse(self.impl_code['bone_trans']).squeeze(0)
-            hcorners, collided_inds = self.partitioner.check_bbox_penetrations(bb_min, bb_max, abs_trans)
-            collision_candidates = self.partitioner.sample_collision_candidates(
-                bb_min, bb_max, abs_trans, collided_inds, n_points_uniform)
-
-        # remove points that are outside
-        if collision_candidates.shape[0] == 0:
-            return torch.tensor(0, device=device, dtype=torch.float32), None, None
-        collision_candidates = torch.cat((collision_candidates, smpl_output.vertices[0].detach().clone()), dim=0)
-        per_part_occupancy = self.query(collision_candidates.unsqueeze(0), smpl_output, ret_intermediate=True)[1]['part_occupancy'].squeeze(0)  # (K, N)
-
-        with torch.no_grad():
-            _po = per_part_occupancy.t() # N, K
-            _po_mask = (_po > self.level_set).float()
-            disable_mat = (~torch.eye(_po.shape[-1], dtype=torch.bool, device=_po.device))
-            disable_mat = (disable_mat & self.partitioner.selfpen_disable_mat).float()
-            _conflicting_inds = (_po_mask[:, :, None] @ _po_mask[:, None, :])*disable_mat[None] # N,K,K
-            conflicting_inds = _conflicting_inds.reshape(_conflicting_inds.shape[0], -1).sum(-1) >= 2.0
-        
-        conf_parts = per_part_occupancy.t()[conflicting_inds]  # inside 1, outside 0 [samples, K]
-        if len(conf_parts.shape) == 0 or conf_parts.shape[0] == 0:
-            return torch.tensor(0, device=device, dtype=torch.float32), None, None
-
-        affected_inds = (conf_parts > self.level_set).sum(0) >= at_least_n_samples
-        conf_parts = torch.relu(conf_parts)
-        loss = (conf_parts.sum(-1) - self.level_set).sum()
-        _samples = collision_candidates[conflicting_inds]
-        # print(f'\n_samples={_samples.shape[0]} ({collision_candidates.shape[0]})\n', np.array(JOINT_NAMES)[torch.where(self.partitioner.joint_mapper)[0].cpu().detach().numpy()][torch.where(affected_inds)[0].detach().cpu().numpy().tolist()])
-        return loss, _samples, affected_inds
+    # def collision_loss(self, point_cloud, smpl_output, ret_collision_mask=False):
+    #     """
+    #     Args:
+    #         point_cloud (list or torch.tensor): B, N, 3
+    #     """
+    #     occupancy = self.query(point_cloud, smpl_output)
+    #     loss = torch.relu(occupancy - self.level_set)  # B,N
+    #     if ret_collision_mask is not None:
+    #         inds = loss > 0
+    #         return loss.sum(-1), inds
+    #     return loss.sum(-1)  # B, N, 3
 
     @staticmethod
     def batchify_smpl_output(smpl_output):
@@ -972,7 +913,7 @@ class VolumetricSMPL(BasicBodyModel): #  volSMPL model
         )
         return decoder
 
-    def _fwd_pass(self, local_queries, inside_bbox):
+    def _fwd_pass(self, local_queries, inside_bbox, only_part_occupancy=False):
         """
         Args:
             local_query (torch.tensor): B,K, T, 3
@@ -997,6 +938,8 @@ class VolumetricSMPL(BasicBodyModel): #  volSMPL model
         # fuse occupancy
         part_occupancy = torch.sigmoid(-part_occ).squeeze(-1)
         part_occupancy = part_occupancy*inside_bbox  # (B, K, T)
+        if only_part_occupancy:
+            return part_occupancy
         occupancy = part_occupancy.max(dim=1).values  # (B, T)
 
         # fuse udf
@@ -1196,6 +1139,65 @@ class VolumetricSMPL(BasicBodyModel): #  volSMPL model
         occupancy = self._fwd_pass(local_queries, inside_bbox)[0] # B,K
         return occupancy
 
+    def self_collision_loss(self, smpl_output, n_points_uniform=300, at_least_n_samples=2, ret_samples=False):
+        b_smpl_output_list = self.batchify_smpl_output(smpl_output)
+        self_pen_losses = []
+        samples_list = []
+        for b_ind in range(len(b_smpl_output_list)):
+            loss, _samples, _ = self._self_penetration_loss(b_smpl_output_list[b_ind], n_points_uniform, at_least_n_samples)
+            self_pen_losses.append(loss)
+            if ret_samples:
+                samples_list.append(_samples)
+        self_pen_losses = torch.stack(self_pen_losses)
+        if ret_samples:
+            return self_pen_losses, samples_list
+        return self_pen_losses
+
+    def _self_penetration_loss(self, smpl_output, n_points_uniform, at_least_n_samples):
+        """
+        Args:
+            n_points_uniform (int): how many points per collided body part to sample
+
+        Returns:
+
+        """
+        self._attach_impl_code(smpl_output)
+        bb_min = self.impl_code['bbox_min'].squeeze(0)
+        bb_max = self.impl_code['bbox_max'].squeeze(0)
+        device = bb_min.device
+
+        with torch.no_grad():
+            abs_trans = torch.inverse(self.impl_code['bone_trans']).squeeze(0)
+            hcorners, collided_inds = self.partitioner.check_bbox_penetrations(bb_min, bb_max, abs_trans)
+            collision_candidates = self.partitioner.sample_collision_candidates(
+                bb_min, bb_max, abs_trans, collided_inds, n_points_uniform)
+
+        # remove points that are outside
+        if collision_candidates.shape[0] == 0:
+            return torch.tensor(0, device=device, dtype=torch.float32), None, None
+        collision_candidates = torch.cat((collision_candidates, smpl_output.vertices[0].detach().clone()), dim=0)
+        if True:
+            local_queries, inside_bbox = self.to_local(collision_candidates.unsqueeze(0), self.impl_code['bone_trans'], self.impl_code['bbox_center'], self.impl_code['bbox_size'])
+            per_part_occupancy = self._fwd_pass(local_queries, inside_bbox, only_part_occupancy=True).squeeze(0)  # (K, N)
+
+        with torch.no_grad():
+            _po = per_part_occupancy.t() # N, K
+            _po_mask = (_po > self.level_set).float()
+            disable_mat = (~torch.eye(_po.shape[-1], dtype=torch.bool, device=_po.device))
+            disable_mat = (disable_mat & self.partitioner.selfpen_disable_mat).float()
+            _conflicting_inds = (_po_mask[:, :, None] @ _po_mask[:, None, :])*disable_mat[None] # N,K,K
+            conflicting_inds = _conflicting_inds.reshape(_conflicting_inds.shape[0], -1).sum(-1) >= 2.0
+        
+        conf_parts = per_part_occupancy.t()[conflicting_inds]  # inside 1, outside 0 [samples, K]
+        if len(conf_parts.shape) == 0 or conf_parts.shape[0] == 0:
+            return torch.tensor(0, device=device, dtype=torch.float32), None, None
+
+        affected_inds = (conf_parts > self.level_set).sum(0) >= at_least_n_samples
+        conf_parts = torch.relu(conf_parts)
+        loss = (conf_parts.sum(-1) - self.level_set).sum()
+        _samples = collision_candidates[conflicting_inds]
+        print(f'\n_samples={_samples.shape[0]} ({collision_candidates.shape[0]})\n', np.array(JOINT_NAMES)[torch.where(self.partitioner.joint_mapper)[0].cpu().detach().numpy()][torch.where(affected_inds)[0].detach().cpu().numpy().tolist()])
+        return loss, _samples, affected_inds
 
 @torch.no_grad()
 def debug_vis_body_model(parametric_body):
