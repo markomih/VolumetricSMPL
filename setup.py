@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='VolumetricSMPL',
-    version='1.0.2',
+    version='1.0.3',
     packages=['VolumetricSMPL'],
     url='https://github.com/markomih/VolumetricSMPL',
     license='MIT',
