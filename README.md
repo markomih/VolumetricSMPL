@@ -38,5 +38,14 @@ model.volume.collision_loss(smpl_output, scan_point_cloud)  # Compute collisions
 # Pretrained Models
 Pretrained models are automatically fetched and loaded. They can also be found in the `dev` branch inside the `./models` directory.
 
+# Citation
+```bibtex
+@inproceedings{ICCV25:VolumetricSMPL,
+   title={{VolumetricSMPL}: A Neural Volumetric Body Model for Efficient Interactions, Contacts, and Collisions},
+   author={Mihajlovic, Marko and Zhang, Siwei and Li, Gen and Zhao, Kaifeng and M{\"u}ller, Lea and Tang, Siyu},
+   booktitle={Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+   year={2025}
+}
+```
 # Contact
-For questions, please contact Marko Mihajlovic (_markomih@ethz.ch_) or open an issue on GitHub. 
+For questions, please contact Marko Mihajlovic (_markomih@ethz.ch_) or raise an issue on GitHub.
