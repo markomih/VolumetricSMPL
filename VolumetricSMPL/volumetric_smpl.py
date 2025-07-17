@@ -1139,12 +1139,12 @@ class VolumetricSMPL(BasicBodyModel): #  volSMPL model
         occupancy = self._fwd_pass(local_queries, inside_bbox)[0] # B,K
         return occupancy
 
-    def self_collision_loss(self, smpl_output, n_points_uniform=300, at_least_n_samples=2, ret_samples=False):
+    def self_collision_loss(self, smpl_output, n_points_uniform=300, at_least_n_samples=2, ret_samples=False, verbose=False):
         b_smpl_output_list = self.batchify_smpl_output(smpl_output)
         self_pen_losses = []
         samples_list = []
         for b_ind in range(len(b_smpl_output_list)):
-            loss, _samples, _ = self._self_penetration_loss(b_smpl_output_list[b_ind], n_points_uniform, at_least_n_samples)
+            loss, _samples, _ = self._self_penetration_loss(b_smpl_output_list[b_ind], n_points_uniform, at_least_n_samples, verbose=verbose)
             self_pen_losses.append(loss)
             if ret_samples:
                 samples_list.append(_samples)
@@ -1153,7 +1153,7 @@ class VolumetricSMPL(BasicBodyModel): #  volSMPL model
             return self_pen_losses, samples_list
         return self_pen_losses
 
-    def _self_penetration_loss(self, smpl_output, n_points_uniform, at_least_n_samples):
+    def _self_penetration_loss(self, smpl_output, n_points_uniform, at_least_n_samples, verbose=False):
         """
         Args:
             n_points_uniform (int): how many points per collided body part to sample
@@ -1196,7 +1196,8 @@ class VolumetricSMPL(BasicBodyModel): #  volSMPL model
         conf_parts = torch.relu(conf_parts)
         loss = (conf_parts.sum(-1) - self.level_set).sum()
         _samples = collision_candidates[conflicting_inds]
-        print(f'\n_samples={_samples.shape[0]} ({collision_candidates.shape[0]})\n', np.array(JOINT_NAMES)[torch.where(self.partitioner.joint_mapper)[0].cpu().detach().numpy()][torch.where(affected_inds)[0].detach().cpu().numpy().tolist()])
+        if verbose:
+            print(f'\n_samples={_samples.shape[0]} ({collision_candidates.shape[0]})\n', np.array(JOINT_NAMES)[torch.where(self.partitioner.joint_mapper)[0].cpu().detach().numpy()][torch.where(affected_inds)[0].detach().cpu().numpy().tolist()])
         return loss, _samples, affected_inds
 
 @torch.no_grad()
