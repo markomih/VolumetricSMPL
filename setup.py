@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='VolumetricSMPL',
-    version='1.0.3',  # Bump version to trigger new upload
+    version='1.0.4',  # Bump version to trigger new upload
     packages=['VolumetricSMPL'],
     url='https://github.com/markomih/VolumetricSMPL',
     license='MIT',
